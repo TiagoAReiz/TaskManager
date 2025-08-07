@@ -32,7 +32,7 @@ import { TaskDialogComponent, TaskDialogData } from '../task-dialog/task-dialog.
       </div>
 
       <div class="filters">
-        <mat-chip-listbox aria-label="Status Filter" [value]="selectedFilter" (selectionChange)="onFilterChange($event)">
+        <mat-chip-listbox #chipList aria-label="Status Filter" [value]="selectedFilter" (change)="filterTasks(chipList.value || 'all')">
           <mat-chip-option value="all">
             Todas ({{ allTasks().length }})
           </mat-chip-option>
@@ -208,13 +208,6 @@ export class TaskListComponent implements OnInit {
   filterTasks(filter: 'all' | 'pending' | 'completed'): void {
     this.selectedFilter = filter;
     this.applyFilter();
-  }
-
-  onFilterChange(event: any): void {
-    const value = event.value;
-    if (value) {
-      this.filterTasks(value);
-    }
   }
 
   private applyFilter(): void {
