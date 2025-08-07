@@ -1,0 +1,52 @@
+# Arquivos e diretórios para ignorar no build Docker
+
+# Diretórios de build e cache do Maven
+target/
+.mvn/wrapper/maven-wrapper.jar
+.mvn/wrapper/maven-wrapper.properties
+
+# Logs
+*.log
+logs/
+
+# IDEs
+.vscode/
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile
+.dockerignore
+
+# Documentação
+README.md
+*.md
+
+# Arquivos temporários
+*.tmp
+*.temp
+*.swp
+*.swo
+
+# Arquivos de configuração local
+.env
+*.properties.local
+
+# Testes
+src/test/
+
+# Frontend (está em outro contexto)
+../frontend/
+
+# Scripts
+../scripts/

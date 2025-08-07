@@ -1,0 +1,228 @@
+name: Deploy TaskMaster to Azure
+
+# Trigger: Pipeline será executado quando houver push na branch main
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+# Variáveis de ambiente globais do workflow
+env:
+  AZURE_WEBAPP_NAME: taskmaster-app    # Nome do Azure App Service
+  JAVA_VERSION: '17'                   # Versão do Java
+  IMAGE_NAME: taskmaster-backend       # Nome da imagem Docker
+
+jobs:
+  # Job 1: Build e Push da imagem Docker para Azure Container Registry
+  build-and-push-to-acr:
+    runs-on: ubuntu-latest
+    
+    outputs:
+      # Outputs para usar no próximo job
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
+    
+    steps:
+    # Faz checkout do código do repositório
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    # Configura Java 17 para compilação
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: 'temurin'
+        cache: maven
+    
+    # Executa testes unitários antes do build
+    - name: Run tests
+      run: |
+        cd taskManager
+        mvn clean test
+    
+    # Faz login no Azure Container Registry
+    - name: Log in to Azure Container Registry
+      uses: azure/docker-login@v1
+      with:
+        login-server: ${{ secrets.ACR_LOGIN_SERVER }}
+        username: ${{ secrets.ACR_USERNAME }}
+        password: ${{ secrets.ACR_PASSWORD }}
+    
+    # Extrai metadados para tags e labels da imagem Docker
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+    
+    # Configura Docker Buildx para build otimizado
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    # Constrói e faz push da imagem Docker
+    - name: Build and push Docker image
+      id: build
+      uses: docker/build-push-action@v5
+      with:
+        context: ./taskManager
+        file: ./taskManager/Dockerfile
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        platforms: linux/amd64
+    
+    # Escaneia a imagem por vulnerabilidades (opcional)
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+      continue-on-error: true
+    
+    # Upload dos resultados do scan de segurança
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+      continue-on-error: true
+
+  # Job 2: Deploy no Azure App Service
+  deploy-to-app-service:
+    runs-on: ubuntu-latest
+    needs: build-and-push-to-acr
+    # Só executa em push na main (não em PRs)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    environment:
+      name: 'Production'
+      url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
+    
+    steps:
+    # Faz login no Azure usando Service Principal
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+    
+    # Configura variáveis de ambiente no App Service
+    - name: Set App Service configuration
+      uses: azure/appservice-settings@v1
+      with:
+        app-name: ${{ env.AZURE_WEBAPP_NAME }}
+        app-settings-json: |
+          [
+            {
+              "name": "SPRING_PROFILES_ACTIVE",
+              "value": "azure"
+            },
+            {
+              "name": "SPRING_DATASOURCE_URL",
+              "value": "${{ secrets.DATABASE_URL }}"
+            },
+            {
+              "name": "SPRING_DATASOURCE_USERNAME",
+              "value": "${{ secrets.DATABASE_USERNAME }}"
+            },
+            {
+              "name": "SPRING_DATASOURCE_PASSWORD",
+              "value": "${{ secrets.DATABASE_PASSWORD }}"
+            },
+            {
+              "name": "JWT_SECRET",
+              "value": "${{ secrets.JWT_SECRET }}"
+            },
+            {
+              "name": "JWT_EXPIRATION",
+              "value": "86400000"
+            },
+            {
+              "name": "DOCKER_REGISTRY_SERVER_URL",
+              "value": "https://${{ secrets.ACR_LOGIN_SERVER }}"
+            },
+            {
+              "name": "DOCKER_REGISTRY_SERVER_USERNAME",
+              "value": "${{ secrets.ACR_USERNAME }}"
+            },
+            {
+              "name": "DOCKER_REGISTRY_SERVER_PASSWORD",
+              "value": "${{ secrets.ACR_PASSWORD }}"
+            }
+          ]
+    
+    # Faz deploy da aplicação no App Service
+    - name: Deploy to Azure App Service
+      id: deploy-to-webapp
+      uses: azure/webapps-deploy@v2
+      with:
+        app-name: ${{ env.AZURE_WEBAPP_NAME }}
+        images: ${{ needs.build-and-push-to-acr.outputs.image-tag }}
+    
+    # Aguarda o serviço ficar disponível e verifica health
+    - name: Health Check
+      run: |
+        # Aguarda 60 segundos para o serviço inicializar
+        sleep 60
+        
+        # Verifica se o endpoint de health responde
+        for i in {1..10}; do
+          if curl -f "${{ steps.deploy-to-webapp.outputs.webapp-url }}/actuator/health"; then
+            echo "Health check passed!"
+            exit 0
+          else
+            echo "Health check failed, attempt $i/10"
+            sleep 30
+          fi
+        done
+        
+        echo "Health check failed after 10 attempts"
+        exit 1
+    
+    # Notifica sobre o deploy bem-sucedido
+    - name: Deployment Summary
+      run: |
+        echo "✅ Deploy realizado com sucesso!" >> $GITHUB_STEP_SUMMARY
+        echo "🔗 URL da aplicação: ${{ steps.deploy-to-webapp.outputs.webapp-url }}" >> $GITHUB_STEP_SUMMARY
+        echo "🐳 Imagem deployada: ${{ needs.build-and-push-to-acr.outputs.image-tag }}" >> $GITHUB_STEP_SUMMARY
+        echo "📊 Health Check: https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net/actuator/health" >> $GITHUB_STEP_SUMMARY
+
+  # Job 3: Limpeza de imagens antigas no ACR (opcional)
+  cleanup-old-images:
+    runs-on: ubuntu-latest
+    needs: deploy-to-app-service
+    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+    
+    # Remove imagens antigas para economizar espaço (mantém as 5 mais recentes)
+    - name: Clean up old images
+      run: |
+        az acr repository show-tags \
+          --name $(echo ${{ secrets.ACR_LOGIN_SERVER }} | cut -d'.' -f1) \
+          --repository ${{ env.IMAGE_NAME }} \
+          --orderby time_desc \
+          --output tsv | tail -n +6 | \
+        while read tag; do
+          if [ ! -z "$tag" ]; then
+            echo "Removing old image: ${{ env.IMAGE_NAME }}:$tag"
+            az acr repository delete \
+              --name $(echo ${{ secrets.ACR_LOGIN_SERVER }} | cut -d'.' -f1) \
+              --image ${{ env.IMAGE_NAME }}:$tag \
+              --yes
+          fi
+        done
+      continue-on-error: true
