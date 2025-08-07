@@ -7,7 +7,7 @@ import { LoginRequest, RegisterRequest, LoginResponse, User } from '../models';
   providedIn: 'root'
 })
 export class AuthService {
-  private readonly API_URL = 'http://localhost:8080/api/auth';
+  private readonly API_URL = '/api/auth';
   private readonly TOKEN_KEY = 'taskmaster_token';
   private readonly USER_KEY = 'taskmaster_user';
 
@@ -49,9 +49,27 @@ export class AuthService {
   private setSession(response: LoginResponse): void {
     if (typeof window !== 'undefined' && window.localStorage) {
       localStorage.setItem(this.TOKEN_KEY, response.token);
-      localStorage.setItem(this.USER_KEY, JSON.stringify(response.user));
+      
+      // Convert response to User object
+      const user: User = {
+        userId: response.userId,
+        name: response.name,
+        email: response.email,
+        userCreatedAt: response.userCreatedAt
+      };
+      
+      localStorage.setItem(this.USER_KEY, JSON.stringify(user));
     }
-    this._currentUser.set(response.user);
+    
+    // Create user object for signal
+    const currentUser: User = {
+      userId: response.userId,
+      name: response.name,
+      email: response.email,
+      userCreatedAt: response.userCreatedAt
+    };
+    
+    this._currentUser.set(currentUser);
   }
 
   private clearSession(): void {
@@ -64,11 +82,15 @@ export class AuthService {
 
   private getUserFromStorage(): User | null {
     if (typeof window !== 'undefined' && window.localStorage) {
+      // Limpar dados antigos que podem estar causando conflito
+      localStorage.removeItem('currentUser');
+      
       const userStr = localStorage.getItem(this.USER_KEY);
       if (userStr) {
         try {
           return JSON.parse(userStr);
-        } catch {
+        } catch (error) {
+          localStorage.removeItem(this.USER_KEY);
           return null;
         }
       }

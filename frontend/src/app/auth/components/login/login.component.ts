@@ -129,7 +129,7 @@ export class LoginComponent {
       const credentials: LoginRequest = this.loginForm.value;
 
       this.authService.login(credentials).subscribe({
-        next: () => {
+        next: (response) => {
           this.router.navigate(['/tasks']);
           this.snackBar.open('Login realizado com sucesso!', 'Fechar', {
             duration: 3000

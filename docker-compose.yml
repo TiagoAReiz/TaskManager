@@ -86,7 +86,7 @@ services:
       - "443:443"
     volumes:
       # Monta o build do Angular
-      - ./frontend/dist/frontend:/usr/share/nginx/html:ro
+      - ./frontend/dist/frontend/browser:/usr/share/nginx/html:ro
       # Monta a configuração customizada do Nginx
       - ./frontend/nginx.conf:/etc/nginx/nginx.conf:ro
       # Volume para logs do Nginx

@@ -1,7 +1,8 @@
 export interface User {
-  id: string;
+  userId: number;
   name: string;
   email: string;
+  userCreatedAt: string;
 }
 
 export interface LoginRequest {
@@ -17,5 +18,9 @@ export interface RegisterRequest {
 
 export interface LoginResponse {
   token: string;
-  user: User;
+  tokenType: string;
+  userId: number;
+  name: string;
+  email: string;
+  userCreatedAt: string;
 }

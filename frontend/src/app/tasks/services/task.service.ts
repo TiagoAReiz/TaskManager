@@ -7,7 +7,7 @@ import { Task, CreateTaskRequest, UpdateTaskRequest, UpdateTaskStatusRequest, Ta
   providedIn: 'root'
 })
 export class TaskService {
-  private readonly API_URL = 'http://localhost:8080/api/tasks';
+  private readonly API_URL = '/api/tasks';
 
   constructor(private http: HttpClient) {}
 
@@ -27,8 +27,9 @@ export class TaskService {
     return this.http.put<Task>(`${this.API_URL}/${id}`, task);
   }
 
-  updateTaskStatus(id: string, status: UpdateTaskStatusRequest): Observable<Task> {
-    return this.http.patch<Task>(`${this.API_URL}/${id}/status`, status);
+  updateTaskStatus(id: string, statusRequest: UpdateTaskStatusRequest): Observable<Task> {
+    const params = new HttpParams().set('status', statusRequest.status);
+    return this.http.patch<Task>(`${this.API_URL}/${id}/status`, null, { params });
   }
 
   deleteTask(id: string): Observable<void> {

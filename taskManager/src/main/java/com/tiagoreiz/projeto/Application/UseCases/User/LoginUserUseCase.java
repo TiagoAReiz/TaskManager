@@ -81,7 +81,7 @@ public class LoginUserUseCase {
                     .orElseThrow(() -> new InvalidCredentialsException("User not found"));
             
             // Gera o token JWT
-            String token = jwtService.generateToken(userDetails, user.getId());
+            String token = jwtService.generateTokenWithUserId(userDetails, user.getId());
             
             return Result.success(new LoginResult(token, user));
             
