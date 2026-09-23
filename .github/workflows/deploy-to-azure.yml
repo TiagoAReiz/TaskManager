@@ -1,11 +1,16 @@
 name: Deploy TaskMaster to Azure
 
-# Trigger: Pipeline será executado quando houver push na branch main
+# Trigger: execução manual (Actions > Deploy TaskMaster to Azure > Run workflow).
+# O disparo automático em push/PR foi desativado porque o pipeline depende de
+# recursos Azure (ACR, App Service, Service Principal) e de secrets do repositório
+# (ACR_LOGIN_SERVER, ACR_USERNAME, ACR_PASSWORD, AZURE_CREDENTIALS, DATABASE_URL,
+# DATABASE_USERNAME, DATABASE_PASSWORD, JWT_SECRET) que precisam ser configurados
+# antes. Build e testes de cada push/PR rodam no workflow CI (ci.yml).
+# Para reativar o deploy contínuo após configurar os secrets, adicione:
+#   push:
+#     branches: [ main ]
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+  workflow_dispatch:
 
 # Variáveis de ambiente globais do workflow
 env:
@@ -91,7 +96,7 @@ jobs:
     
     # Upload dos resultados do scan de segurança
     - name: Upload Trivy scan results
-      uses: github/codeql-action/upload-sarif@v2
+      uses: github/codeql-action/upload-sarif@v3
       if: always()
       with:
         sarif_file: 'trivy-results.sarif'
@@ -101,8 +106,8 @@ jobs:
   deploy-to-app-service:
     runs-on: ubuntu-latest
     needs: build-and-push-to-acr
-    # Só executa em push na main (não em PRs)
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Só faz deploy a partir da main
+    if: github.ref == 'refs/heads/main'
     
     environment:
       name: 'Production'
@@ -200,7 +205,7 @@ jobs:
   cleanup-old-images:
     runs-on: ubuntu-latest
     needs: deploy-to-app-service
-    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: always() && github.ref == 'refs/heads/main'
     
     steps:
     - name: Azure Login

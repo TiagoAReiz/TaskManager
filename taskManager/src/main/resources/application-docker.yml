@@ -2,7 +2,7 @@ spring:
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://postgres-db:5432/taskmaster}
     username: ${SPRING_DATASOURCE_USERNAME:taskmaster_user}
-    password: ${SPRING_DATASOURCE_PASSWORD:taskmaster_pass}
+    password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 10
@@ -25,7 +25,7 @@ spring:
   
   security:
     jwt:
-      secret: ${JWT_SECRET:mySecretKey123456789012345678901234567890}
+      secret: ${JWT_SECRET}
       expiration: ${JWT_EXPIRATION:86400000}
 
 server:

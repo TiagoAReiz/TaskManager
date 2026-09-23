@@ -65,7 +65,7 @@ docker-compose up --build -d
 ```
 projeto/
 ├── docker-compose.yml           # Orquestração dos containers
-├── env.example                  # Exemplo de variáveis de ambiente
+├── .env.example                 # Exemplo de variáveis de ambiente
 ├── scripts/
 │   └── start-dev.sh            # Script de desenvolvimento
 ├── taskManager/
@@ -82,10 +82,10 @@ projeto/
 
 ### Variáveis de Ambiente
 
-Copie `env.example` para `.env` e ajuste conforme necessário:
+Copie `.env.example` para `.env` e defina seus próprios valores (o `.env` é ignorado pelo Git). `POSTGRES_PASSWORD` e `JWT_SECRET` são obrigatórios:
 
 ```bash
-cp env.example .env
+cp .env.example .env
 ```
 
 ### Configurações do Docker Compose
@@ -114,7 +114,7 @@ Após inicializar a aplicação:
 - **Sistema**: PostgreSQL
 - **Servidor**: postgres-db
 - **Usuário**: taskmaster_user
-- **Senha**: taskmaster_pass
+- **Senha**: valor de `POSTGRES_PASSWORD` no seu `.env`
 - **Base de dados**: taskmaster
 
 ## 🛠️ Comandos Úteis
