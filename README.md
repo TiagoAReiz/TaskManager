@@ -8,7 +8,7 @@
 ![Angular](https://img.shields.io/badge/Angular-20.1.0-red.svg)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-blue.svg)
 ![Docker](https://img.shields.io/badge/Docker-Compose-blue.svg)
-![Azure](https://img.shields.io/badge/Deploy-Azure-blue.svg)
+[![CI](https://github.com/TiagoAReiz/TaskManager/actions/workflows/ci.yml/badge.svg)](https://github.com/TiagoAReiz/TaskManager/actions/workflows/ci.yml)
 
 Uma aplicação completa de gerenciamento de tarefas desenvolvida com **Clean Architecture**, seguindo as melhores práticas de desenvolvimento e DevOps.
 
@@ -29,6 +29,14 @@ TaskMaster é uma aplicação moderna de gerenciamento de tarefas que permite ao
 - 📱 **Interface Responsiva** - Desenvolvida com Angular Material
 - 🛡️ **Segurança Robusta** - Proteção de rotas e validação de dados
 - 📖 **Documentação API** - Swagger/OpenAPI integrado
+
+### 📸 Screenshots
+
+Capturas da aplicação rodando localmente via `docker compose` (dados de demonstração):
+
+| Login | Minhas Tarefas |
+|-------|----------------|
+| ![Tela de login](docs/screenshots/login.png) | ![Lista de tarefas](docs/screenshots/tarefas.png) |
 
 ## 🏗️ Arquitetura
 
@@ -111,19 +119,25 @@ O backend segue os princípios da **Clean Architecture**, garantindo separação
 
 ```bash
 # 1. Clone o repositório
-git clone <repository-url>
-cd projeto
+git clone https://github.com/TiagoAReiz/TaskManager.git
+cd TaskManager
 
 # 2. Configure as variáveis de ambiente
-cp env.example .env
+cp .env.example .env
+# Edite o .env e defina POSTGRES_PASSWORD e JWT_SECRET (obrigatórios)
+# Ex.: JWT_SECRET=$(openssl rand -base64 48)
 
-# 3. Execute a aplicação
-docker-compose up --build
+# 3. Gere o build do frontend (o Nginx serve frontend/dist/frontend/browser)
+cd frontend && npm ci && npm run build && cd ..
 
-# 4. Acesse a aplicação
+# 4. Execute a aplicação
+docker compose up --build
+
+# 5. Acesse a aplicação
 # Frontend: http://localhost
 # Backend API: http://localhost:8080/api
 # Swagger UI: http://localhost:8080/swagger-ui.html
+# Health check: http://localhost:8080/actuator/health
 # Adminer (dev): http://localhost:8081
 ```
 
@@ -131,20 +145,20 @@ docker-compose up --build
 
 ```bash
 # Executar apenas serviços principais
-docker-compose up postgres-db backend frontend
+docker compose up postgres-db backend frontend
 
 # Executar com Adminer para desenvolvimento
-docker-compose --profile dev up
+docker compose --profile dev up
 
 # Ver logs de um serviço específico
-docker-compose logs -f backend
+docker compose logs -f backend
 
 # Rebuild completo
-docker-compose build --no-cache
-docker-compose up --force-recreate
+docker compose build --no-cache
+docker compose up --force-recreate
 
 # Parar e remover volumes (dados serão perdidos)
-docker-compose down -v
+docker compose down -v
 ```
 
 ## 🚀 Desenvolvimento Local
@@ -158,6 +172,9 @@ cd taskManager
 mvn clean test
 
 # Executar localmente (certifique-se que o PostgreSQL está rodando)
+# Os segredos vêm de variáveis de ambiente — não há senhas no application.properties
+export SPRING_DATASOURCE_PASSWORD=<senha-do-postgres>
+export JWT_SECRET=<string-aleatoria-com-32+-caracteres>
 mvn spring-boot:run
 
 # Build para produção
@@ -172,14 +189,12 @@ cd frontend
 # Instalar dependências
 npm install
 
-# Executar em modo de desenvolvimento
-ng serve
+# Executar em modo de desenvolvimento (http://localhost:4200)
+# As chamadas para /api são redirecionadas para http://localhost:8080 via proxy.conf.json
+npx ng serve
 
 # Build para produção
-ng build
-
-# Executar testes
-ng test
+npm run build
 ```
 
 ## 📋 API Endpoints
@@ -243,14 +258,16 @@ CREATE TABLE tasks (
 
 ### Variáveis de Ambiente
 
+Todas as variáveis estão documentadas em [`.env.example`](./.env.example). Copie para `.env` (ignorado pelo Git) e defina valores próprios:
+
 ```bash
 # Banco de Dados
 POSTGRES_DB=taskmaster
 POSTGRES_USER=taskmaster_user
-POSTGRES_PASSWORD=taskmaster_pass
+POSTGRES_PASSWORD=change-me            # obrigatório
 
 # JWT
-JWT_SECRET=mySecretKey123456789012345678901234567890
+JWT_SECRET=change-me-to-a-random-string-with-at-least-32-chars   # obrigatório
 JWT_EXPIRATION=86400000
 
 # Aplicação
@@ -268,9 +285,14 @@ LOGGING_LEVEL_COM_TIAGOREIZ=DEBUG
 
 ### Azure App Service
 
-O projeto inclui pipeline completo de CI/CD para Azure:
+O projeto inclui um pipeline de deploy para Azure em `.github/workflows/deploy-to-azure.yml`.
+Ele é executado **manualmente** (`workflow_dispatch`), pois depende de recursos Azure e de secrets
+do repositório (ACR, App Service, Service Principal) que precisam ser provisionados antes.
+A integração contínua (build + testes a cada push/PR) roda no workflow [`ci.yml`](./.github/workflows/ci.yml).
 
-1. **GitHub Actions** configurado em `.github/workflows/deploy-to-azure.yml`
+Etapas do pipeline de deploy:
+
+1. **Testes** do backend antes do build
 2. **Build automático** das imagens Docker
 3. **Deploy no Azure Container Registry**
 4. **Deploy no Azure App Service**
@@ -318,32 +340,23 @@ A documentação completa da API está disponível via Swagger UI:
 ## 🧪 Testes
 
 ### Backend
+Testes unitários (JUnit 5 + Mockito + AssertJ) para entidades de domínio, casos de uso e `JwtService`,
+além de um teste de fatia web (`@WebMvcTest`) do `TaskController` com a configuração real de segurança JWT.
+
 ```bash
 cd taskManager
 
 # Executar todos os testes
 mvn test
 
-# Executar testes com relatório de cobertura
+# Executar testes com relatório de cobertura (target/site/jacoco/index.html)
 mvn test jacoco:report
-
-# Testes de integração
-mvn test -Dtest=**/*IntegrationTest
 ```
 
-### Frontend
-```bash
-cd frontend
-
-# Testes unitários
-ng test
-
-# Testes end-to-end
-ng e2e
-
-# Testes com cobertura
-ng test --code-coverage
-```
+### Integração Contínua
+O workflow [`ci.yml`](./.github/workflows/ci.yml) roda em cada push e pull request:
+- **Backend**: `mvn verify` (compilação + testes) com JDK 17
+- **Frontend**: `npm ci` + `npm run build` com Node.js 22
 
 ## 🔍 Monitoramento
 
@@ -380,7 +393,7 @@ Este projeto está licenciado sob a licença MIT - veja o arquivo [LICENSE](LICE
 ## 👨‍💻 Autor
 
 **Tiago Reiz**
-- GitHub: [@tiagoreiz](https://github.com/tiagoreiz)
+- GitHub: [@TiagoAReiz](https://github.com/TiagoAReiz)
 - LinkedIn: [Tiago Reiz](https://linkedin.com/in/tiagoreiz)
 
 ## 🙏 Agradecimentos

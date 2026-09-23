@@ -171,7 +171,7 @@ show_urls() {
     echo "   Sistema: PostgreSQL"
     echo "   Servidor: postgres-db"
     echo "   Usuário: taskmaster_user"
-    echo "   Senha: taskmaster_pass"
+    echo "   Senha: valor de POSTGRES_PASSWORD no arquivo .env"
     echo "   Base de dados: taskmaster"
 }
 

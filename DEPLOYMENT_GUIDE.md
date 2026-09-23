@@ -49,7 +49,7 @@ az acr credential show --name $ACR_NAME
 DB_SERVER_NAME="taskmaster-db-server"  # Deve ser globalmente único
 DB_NAME="taskmaster"
 DB_ADMIN_USER="taskmaster_admin"
-DB_ADMIN_PASSWORD="StrongPassword123!"  # Use uma senha forte
+DB_ADMIN_PASSWORD="<defina-uma-senha-forte>"  # Nunca commite este valor
 
 # Criar servidor PostgreSQL
 az postgres flexible-server create \
@@ -159,7 +159,7 @@ Crie os seguintes **Repository Secrets**:
 ### 2.4 Configurações da Aplicação
 
 - **Nome**: `JWT_SECRET`
-- **Valor**: Uma string segura de pelo menos 256 bits (ex: `myVerySecureJwtSecretKey123456789012345678901234567890`)
+- **Valor**: Uma string segura de pelo menos 256 bits (gere com `openssl rand -base64 48`)
 
 ### 2.5 Informações do Azure
 
